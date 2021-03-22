@@ -49,6 +49,45 @@
     (with-slots (playlist name) object
       (format stream "Napster playlist ~s name: ~A" playlist name))))
 
+(defclass napster-track-source (napster-source)
+  ((id
+    :initarg :id
+    :initform (error "you have to supply a :id to connect to")
+    :documentation "track id")
+   (name
+    :initarg :name
+    :initform nil
+    :documentation "track name")
+   (disc
+    :initarg :disc
+    :initform nil
+    :documentation "track disc")
+   (seconds
+    :initarg :seconds
+    :initform nil
+    :documentation "playback seconds")
+   (explicit
+    :initarg :explicit
+    :initform nil
+    :documentation "is the song explicit")
+   (isrc
+    :initarg :isrc
+    :initform nil
+    :documentation "isr code for the track")
+   (artist
+    :initarg :artist
+    :initform nil
+    :documentation "name of the artist")
+   (album
+    :initarg :album
+    :initform nil
+    :documentation "Album name"))) ;; TODO: artist link?
+
+(defmethod print-object ((object napster-track-source) stream)
+  (print-unreadable-object (object stream :type t)
+    (with-slots (isrc name seconds artist album) object
+      (format stream "~s: ~s/~s ~s (~D)" isrc name album artist seconds))))
+
 (defun gen-playlist-url (napster-playlist-source)
   (with-slots (playlist) napster-playlist-source
     (format nil "~Aplaylists/~A" *napster-api-url* playlist)))
@@ -71,17 +110,44 @@
     (setf (slot-value napster-playlist-source 'track-count) (cdr (assoc :track-count playlist)))
     (setf (slot-value napster-playlist-source 'description) (cdr (assoc :description playlist)))
     (setf (slot-value napster-playlist-source 'modified) (cdr (assoc :modified playlist))))
-  (with-slots (name track-count description modified) napster-playlist-source (values name track-count description modified)))
+  (with-slots (name track-count description modified) napster-playlist-source (list name track-count description modified)))
 
 (defun get-playlist-meta (napster-playlist-source &optional verbose)
   ; FIXME: add ttl based on modified or similar
   (if (slot-value napster-playlist-source 'modified) ;FIXME: verbose log
-      (with-slots (name track-count description modified) napster-playlist-source (values name track-count description modified))
+      (with-slots (name track-count description modified) napster-playlist-source (list name track-count description modified))
   (get-playlist-meta-uncached napster-playlist-source verbose)))
 
 (defun gen-playlist-tracks-url (napster-playlist-source &optional (offset 0) (limit 200))
   (let ((base-url (gen-playlist-url napster-playlist-source)))
     (format nil "~A/tracks?offset=~D&limit=~D" base-url offset limit)))
 
-(defun get-playlist-tracks (napster-playlist-source &optional (offset 0) (limit 200) verbose)
+(defun get-playlist-tracks-src (napster-playlist-source &optional (offset 0) (limit 200) verbose)
   (get-url napster-playlist-source (gen-playlist-tracks-url napster-playlist-source offset limit) verbose))
+
+
+(defun parse-playlist-track (napster-playlist-source track)
+  (let ((name (cdr (assoc :name track)))
+        (id (cdr (assoc :id track)))
+        (disc (cdr (assoc :disc track)))
+        (seconds (cdr (assoc :playback-seconds track)))
+        (explicit (cdr (assoc :is-explicit track)))
+        (isrc (cdr (assoc :isrc track)))
+        (artist (cdr (assoc :artist-name track)))
+        (album (cdr (assoc :album-name track))))
+    (make-instance 'napster-track-source
+                   :apikey (apikey napster-playlist-source)
+                   :id id
+                   :name name
+                   :disc disc
+                   :seconds seconds
+                   :explicit explicit
+                   :isrc isrc
+                   :artist artist
+                   :album album)))
+
+(defun get-playlist-tracks (napster-playlist-source &optional (offset 0) (limit 200) verbose)
+  (let* ((json (json:decode-json-from-string (get-playlist-tracks-src napster-playlist-source offset limit verbose)))
+         (tracks-json (cdr (assoc :tracks json)))
+         (meta (cdr (assoc :meta json))))
+    (list meta (mapcar #'(lambda(x) (parse-playlist-track napster-playlist-source x)) tracks-json))))
