@@ -86,7 +86,7 @@
 (defmethod print-object ((object napster-track-source) stream)
   (print-unreadable-object (object stream :type t)
     (with-slots (isrc name seconds artist album) object
-      (format stream "~s: ~s/~s ~s (~D)" isrc name album artist seconds))))
+      (format stream "~s: ~s/~s ~s (~Ds)" isrc name album artist seconds))))
 
 (defun gen-playlist-url (napster-playlist-source)
   (with-slots (playlist) napster-playlist-source
@@ -110,12 +110,24 @@
     (setf (slot-value napster-playlist-source 'track-count) (cdr (assoc :track-count playlist)))
     (setf (slot-value napster-playlist-source 'description) (cdr (assoc :description playlist)))
     (setf (slot-value napster-playlist-source 'modified) (cdr (assoc :modified playlist))))
-  (with-slots (name track-count description modified) napster-playlist-source (list name track-count description modified)))
+  (with-slots
+        (name track-count description modified)
+      napster-playlist-source `(
+                                (:name . ,name)
+                                (:track-count . ,track-count)
+                                (:description . ,description)
+                                (:modified . ,modified))))
 
 (defun get-playlist-meta (napster-playlist-source &optional verbose)
   ; FIXME: add ttl based on modified or similar
   (if (slot-value napster-playlist-source 'modified) ;FIXME: verbose log
-      (with-slots (name track-count description modified) napster-playlist-source (list name track-count description modified))
+      (with-slots
+            (name track-count description modified)
+          napster-playlist-source `(
+                                    (:name . ,name)
+                                    (:track-count . ,track-count)
+                                    (:description . ,description)
+                                    (:modified . ,modified)))
   (get-playlist-meta-uncached napster-playlist-source verbose)))
 
 (defun gen-playlist-tracks-url (napster-playlist-source &optional (offset 0) (limit 200))
@@ -151,3 +163,16 @@
          (tracks-json (cdr (assoc :tracks json)))
          (meta (cdr (assoc :meta json))))
     (list meta (mapcar #'(lambda(x) (parse-playlist-track napster-playlist-source x)) tracks-json))))
+
+(defun get-playlist-tracks-all (napster-playlist-source &optional (offset 0) verbose)
+  (let ((current offset)
+        (track-count (cdr (assoc :track-count (get-playlist-meta napster-playlist-source))))
+        (playlist-combined nil))
+    (loop until (>= current track-count)
+          collect
+          (let* ((part (get-playlist-tracks napster-playlist-source current (min (- track-count current) 200) verbose))
+                 (meta (cdr (nth 0 part))))
+            (incf current (cdr (assoc :returned-count meta)))
+            (setf playlist-combined (append playlist-combined (nth 1 part)))
+            ))
+    playlist-combined))
