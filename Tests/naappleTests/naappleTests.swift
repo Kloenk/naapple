@@ -29,17 +29,6 @@ final class naappleTests: XCTestCase {
         semaphore.wait();
         print("name: \(napsterPlaylist.trackCount!)")
         
-        napsterPlaylist.getTracksApi { result in
-            switch result {
-            case .failure(let e):
-                print("error: \(e)")
-            case .success(let d):
-                //print("playlist: \(String(decoding: d, as: UTF8.self))")
-                print("playlist_bytes: \(d.tracks.first!.name)")
-            }
-            
-        }
-        
         napsterPlaylist.getTracks(offset: 0,completion: {result in
             switch result {
             case .failure(let e):

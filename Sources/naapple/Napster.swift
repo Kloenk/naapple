@@ -199,7 +199,7 @@ class NANapsterPlaylist: NANapsterSource {
         var tracks: [Track]
     }
     
-    struct Track: Decodable {
+    struct Track: Decodable, NATrack {        
         var type: String
         var id: String
         var index: Int
