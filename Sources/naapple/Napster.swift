@@ -89,7 +89,10 @@ class NANapsterPlaylist: NANapsterSource {
         loadJson(fromURLString: url, completion: completion)
     }
     
-    public func getTracks(offset: Int = 0, limit: Int = 0, completion: @escaping (Result<Data, Error>) -> Void) {
+    public func getTracks(offset: Int = 0, limit: Int = 0, completion: @escaping (Result<[Track], Error>) -> Void) {
+        if (limit != 0) {
+            print("limit not yet implemented")
+        }
         // check input
         if cachedData == nil {
             completion(.failure(NANapsterError.NotCachedError))
@@ -97,37 +100,28 @@ class NANapsterPlaylist: NANapsterSource {
         }
         let totalCount = limit != 0 ? min(self.trackCount! - offset, limit) : self.trackCount! - offset
         var missingCount = totalCount
-                
-        /*for x in 0...(Int(ceil(Double(totalCount) / 200)) - 1) {
-            let downloadOffset = 200 * x + offset
-            // TODO: implement upper limit
-            print("download: \(x) (\(downloadOffset) - \(downloadOffset + 200))")
-            getTracksApi(offset: downloadOffset) { result in
-                switch result {
-                case .failure(let e):
-                    // FIXME: stop others
-                    completion(.failure(e))
-                    returned = true;
-                case .success(let d):
-                    ret.updateValue(d, forKey: x)
-                }
-                //semaphore.signal()
-            }
-        }*/
+        var list: [Track] = [];
         
-        
-        
-        // TODO: honour limit
-        getTracksApi(offset: missingCount) { result in
-            missingCount -= 200
+        var callback: (Result<TracksJSON, Error>) -> Void = {_ in}
+        callback = {result in
             switch result {
             case .failure(let e):
                 completion(.failure(e))
-                return
             case .success(let d):
-                print(d)
+                list += d.tracks
+                if missingCount >= 200 {
+                    missingCount -= 200;
+                    print("starting at \(offset + (totalCount - missingCount))")
+                    self.getTracksApi(offset: offset + (totalCount - missingCount), completion: callback)
+                } else {
+                    completion(.success(list))
+                }
             }
         }
+        
+        // TODO: honour limit
+        print("first at \(offset + (totalCount - missingCount))")
+        getTracksApi(offset: offset, completion: callback)
         
     }
     
@@ -217,7 +211,7 @@ class NANapsterPlaylist: NANapsterSource {
         var isAvailableInHiRes: Bool
         var name: String
         /// international standart record code
-        var isrc: String
+        var isrc: String?
         var shortcut: String
         // blurbs
         var artistId: String

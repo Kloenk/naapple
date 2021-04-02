@@ -40,8 +40,18 @@ final class naappleTests: XCTestCase {
             
         }
         
-        napsterPlaylist.getTracks(completion: {_ in})
-        sleep(2)
+        napsterPlaylist.getTracks(offset: 0,completion: {result in
+            switch result {
+            case .failure(let e):
+                print("error: \(e)")
+            case .success(let d):
+                print("list: \(d[500].name)")
+            }
+            semaphore.signal()
+        })
+        
+        semaphore.wait()
+        sleep(5)
         
         
     }
