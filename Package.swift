@@ -22,7 +22,7 @@ let package = Package(
             name: "Naapple",
             dependencies: []),
         .testTarget(
-            name: "naappleTests",
-            dependencies: ["naapple"]),
+            name: "NaappleTests",
+            dependencies: ["Naapple"]),
     ]
 )
